@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<additional>
+    <edgeData id="edgeData"
+              file="edgeData.xml"
+              freq="60"
+              trackVehicles="true"/>
+</additional>
