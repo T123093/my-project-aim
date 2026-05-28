@@ -65,6 +65,20 @@ try:
         vehicle_count = traci.vehicle.getIDCount()
 
         print(f"全車両数 = {vehicle_count}")
+
+        vehicle_ids = traci.vehicle.getIDList()
+        print("車両ID一覧")
+
+        for vid in vehicle_ids:
+            position = traci.vehicle.getPosition(vid)
+            speed = traci.vehicle.getSpeed(vid)
+            lane = traci.vehicle.getLaneID(vid)
+            print(f"{vid}の位置 = {position}")
+            print(f"{vid}の速度 = {speed}")
+            print(f"{vid}のレーン = {lane}")
+
+        max_waiting = 0
+        max_tls = ""
         # ---------------------------------
         # 各交差点ごとに制御
         # ---------------------------------
@@ -116,6 +130,12 @@ try:
             print(f"東西車両数 = {ew_vehicle}")
             print(f"総待ち時間 = {waiting_time}")
 
+            # 最大渋滞更新
+            if waiting_time > max_waiting:
+
+                max_waiting = waiting_time
+                max_tls = tlsID
+
             # 混雑判定
             if waiting_time > 40:
 
@@ -133,7 +153,7 @@ try:
             # ---------------------------------
             # 30stepごとに制御
             # ---------------------------------
-            if waiting_time > 40 and step % 10 == 0:
+            if waiting_time > 40 and step % 30 == 0:
 
                 # 南北混雑
                 if ns_vehicle > ew_vehicle + 3:
@@ -174,6 +194,9 @@ try:
                 current_phase,
                 waiting_time
             ])
+
+        print(f"\n 最大渋滞交差点 = {max_tls}")
+        print(f"\n 最大待ち時間 = {max_waiting}")
 
         step += 1
 
