@@ -73,10 +73,32 @@ try:
             position = traci.vehicle.getPosition(vid)
             speed = traci.vehicle.getSpeed(vid)
             lane = traci.vehicle.getLaneID(vid)
+            arrival_times = []
             print(f"{vid}の位置 = {position}")
             print(f"{vid}の速度 = {speed}")
             print(f"{vid}のレーン = {lane}")
+            lane_position = traci.vehicle.getLanePosition(vid)
+            lane_length = traci.lane.getLength(lane)
+            distance = lane_length - lane_position
+            print(f"{vid}の交差点までの距離 = {distance}")
 
+            if speed > 0:
+                arrival_time = distance / speed
+                arrival_times.append((vid, arrival_time))
+                print(f"{vid}の到達予測時間 = {arrival_time}")
+            else:
+                print("停止中")
+
+        print("\n衝突判定")
+        for i in range(len(arrival_times)):
+            vid1, t1 = arrival_times[i]
+            for j in range(i+1, len(arrival_times)):
+                vid2, t2 = arrival_times[j]
+                diff = abs(t1 - t2)
+                if diff < 2:
+                    print(f"衝突危険:{vid1} , {vid2}")
+                    traci.vehicle.slowDown(vid2, 2, 3)
+                    print(f"{vid2}を減速")
         max_waiting = 0
         max_tls = ""
         # ---------------------------------
