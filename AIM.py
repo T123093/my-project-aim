@@ -23,15 +23,17 @@ for tlsID in tlsIDs:
     # 全方向を大文字の 'G' (優先権ありの緑) に固定
     traci.trafficlight.setRedYellowGreenState(tlsID, "G" * num_links)
 
-# ログ用CSV作成
+# ログ用CSV作成（既存と同じファイル名）
 csv_file = open(r"C:\Users\GLAB-PC002\Desktop\sumo_project\traffic_log_aim.csv", "w", newline="", encoding="utf-8")
 writer = csv.writer(csv_file)
-writer.writerow(["step", "tlsID", "ns_vehicle", "ew_vehicle", "reserved_vehicle", "waiting_time"])
+# 新しい4つの指標に合わせたヘッダー
+writer.writerow(["step", "avg_waiting_time", "max_waiting_time", "throughput", "conflict_count"])
 
 try:
     step = 0
-    reservation = {}      # 交差点の予約状況 { tlsID: {"vehicle": vid, "arrival": 絶対時刻} }
-    slowed_vehicles = {}  # 減速中の車両管理 { vid: 元の最高速度 }
+    link_reservations = {}  # リンク単位での予約管理 { link_idx: {"vehicle": vid, "end_time": time} }
+    conflict_count_total = 0  # 累積の予約競合発生回数
+    passed_vehicles = set()   # 交差点を通過した車両の累積管理
 
     while traci.simulation.getMinExpectedNumber() > 0:
         traci.simulationStep()
@@ -40,76 +42,57 @@ try:
         print(f"\n===== [AIM CONTROL] STEP {step} =====")
         current_time = traci.simulation.getTime()
         vehicle_ids = traci.vehicle.getIDList()
-        current_step_slowed = set()
 
-        # 1. 通過済み車両の予約キャンセル処理
-        for tls in list(reservation.keys()):
-            res_vid = reservation[tls]["vehicle"]
-            # 車両が消えた、またはすでに交差点内（内部レーン ":"）に入ったら予約を解放
-            if res_vid not in vehicle_ids or traci.vehicle.getRoadID(res_vid).startswith(":"):
-                print(f"🔓 予約解放: {res_vid} が交差点を通過または進入しました")
-                del reservation[tls]
+        # 1. 通過済み車両の予約キャンセル（期限切れスロットの解放）
+        for link_idx in list(link_reservations.keys()):
+            if link_reservations[link_idx]["end_time"] < current_time:
+                del link_reservations[link_idx]
+
+        step_waiting_times = []
 
         # 2. 車両ごとのアプローチ＆予約要求処理
         for vid in vehicle_ids:
-            edge = traci.vehicle.getRoadID(vid)
-            if edge.startswith(":"):
+            # 待ち時間の集計用データ取得
+            wait_time = traci.vehicle.getWaitingTime(vid)
+            step_waiting_times.append(wait_time)
+
+            road = traci.vehicle.getRoadID(vid)
+            
+            # 通過車両数（スループット）のカウント用
+            if not road.startswith(":") and road != "":
+                passed_vehicles.add(vid)
+
+            if road.startswith(":"):
                 continue  # 交差点内部にいる車両は判定から除外
 
-            lane = traci.vehicle.getLaneID(vid)
-            speed = traci.vehicle.getSpeed(vid)
-            dist = traci.lane.getLength(lane) - traci.vehicle.getLanePosition(vid)
+            # 車両が次に接近している信号機（交差点）の情報を取得
+            next_tls = traci.vehicle.getNextTLS(vid)
+            if next_tls:
+                tls_id, link_idx, dist, state = next_tls[0]
 
-            if speed > 0.5:
-                # 到着予測時刻（絶対時刻）を計算
-                arrival_time = current_time + (dist / speed)
-
-                # その車両が向かっている交差点（tlsID）を特定
-                target_tls = None
-                for tlsID in tlsIDs:
-                    if lane in traci.trafficlight.getControlledLanes(tlsID):
-                        target_tls = tlsID
-                        break
-
-                # AIM予約ロジック
-                if target_tls:
-                    if target_tls not in reservation:
-                        # 交差点が空いていれば予約成功
-                        reservation[target_tls] = {"vehicle": vid, "arrival": arrival_time}
-                        print(f"📝 予約成功: {vid} -> {target_tls} (予定時刻: {arrival_time:.1f}秒)")
-                    else:
-                        res = reservation[target_tls]
+                # 交差点の手前50m以内にアプローチした場合にAIM制御を作動
+                if dist < 50:
+                    if link_idx in link_reservations:
+                        res = link_reservations[link_idx]
                         if res["vehicle"] != vid:
-                            # 先客との交差点到着時間差をチェック
-                            time_diff = abs(arrival_time - res["arrival"])
-                            if time_diff < 3.0:  # 3秒以内に双方が突入する場合は危険と判定
-                                print(f"⚠ 予約競合: {vid} は {res['vehicle']} と衝突の恐れあり -> 減速指示")
-                                if vid not in slowed_vehicles:
-                                    slowed_vehicles[vid] = traci.vehicle.getMaxSpeed(vid)
-                                    traci.vehicle.slowDown(vid, 1.0, 2.0)  # 2秒かけて1m/sまで減速
-                                current_step_slowed.add(vid)
+                            # 予約競合：先客がいるルートのため減速指示
+                            print(f"⚠ 予約競合: {vid} は進路上の先客と衝突の恐れあり -> 減速指示")
+                            traci.vehicle.slowDown(vid, 2.0, 2.0)  # 2秒かけて2m/sまで減速
+                            conflict_count_total += 1
+                    else:
+                        # 予約成功：対象の走行リンクを一定時間（例：5秒間）占有ロック
+                        link_reservations[link_idx] = {"vehicle": vid, "end_time": current_time + 5.0}
+                        print(f"📝 予約成功: {vid} -> リンク {link_idx} を確保")
 
-        # 3. 危険を脱した（先客が抜けた）車両の加速復帰処理
-        for vid in list(slowed_vehicles.keys()):
-            if vid not in current_step_slowed:
-                if vid in vehicle_ids:
-                    traci.vehicle.setMaxSpeed(vid, slowed_vehicles[vid])
-                    print(f"🚀 減速解除: {vid} を元の最高速度（{slowed_vehicles[vid]}m/s）に復帰")
-                del slowed_vehicles[vid]
+        # 3. 統計データの計算とCSV書き込み
+        avg_wait = sum(step_waiting_times) / len(step_waiting_times) if step_waiting_times else 0
+        max_wait = max(step_waiting_times) if step_waiting_times else 0
+        throughput = len(passed_vehicles)
 
-        # 4. 状況の可視化とログ書き込み
-        for tlsID in tlsIDs:
-            lanes = list(set(traci.trafficlight.getControlledLanes(tlsID)))
-            ns_vehicle = sum(traci.lane.getLastStepVehicleNumber(l) for l in lanes if "n" in l.lower() or "s" in l.lower())
-            ew_vehicle = sum(traci.lane.getLastStepVehicleNumber(l) for l in lanes if "e" in l.lower() or "w" in l.lower())
-            waiting_time = sum(traci.lane.getWaitingTime(l) for l in lanes)
-            
-            res_v = reservation[tlsID]["vehicle"] if tlsID in reservation else "None"
-            writer.writerow([step, tlsID, ns_vehicle, ew_vehicle, res_v, waiting_time])
-
+        writer.writerow([step, avg_wait, max_wait, throughput, conflict_count_total])
         step += 1
 
 finally:
     csv_file.close()
     traci.close()
-    print("シミュレーション終了")
+    print("シミュレーション終了: データが traffic_log_aim.csv に保存されました")
