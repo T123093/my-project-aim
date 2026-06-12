@@ -14,35 +14,34 @@ sumoCmd = [sumoBinary, "-c", r"C:\Users\GLAB-PC002\Desktop\sumo_project\test.sum
 traci.start(sumoCmd)
 tlsIDs = traci.trafficlight.getIDList()
 
-# ログ用CSV作成
-csv_file = open(r"C:\Users\GLAB-PC002\Desktop\sumo_project\traffic_log_tls.csv", "w", newline="", encoding="utf-8")
+# ログ用CSV作成（ファイル名をactuatedに変えて区別します）
+csv_file = open(r"C:\Users\GLAB-PC002\Desktop\sumo_project\traffic_log_actuated_tls.csv", "w", newline="", encoding="utf-8")
 writer = csv.writer(csv_file)
-writer.writerow(["step", "tlsID", "ns_vehicle", "ew_vehicle", "phase", "waiting_time"])
+writer.writerow(["step", "avg_waiting_time", "max_waiting_time", "throughput", "conflict_count"])
 
 try:
     step = 0
+    passed_vehicles = set()   # 交差点を通過した車両の累積管理
 
     while traci.simulation.getMinExpectedNumber() > 0:
         traci.simulationStep()
         time.sleep(0.1)
 
-        print(f"\n===== [TLS CONTROL] STEP {step} =====")
-        max_waiting = 0
-        max_tls = ""
+        print(f"\n===== [ACTUATED TLS CONTROL] STEP {step} =====")
+        step_waiting_times = []
 
-        # 各交差点ごとに制御
+        # 各交差点ごとに動的制御を適用
         for tlsID in tlsIDs:
             lanes = list(set(traci.trafficlight.getControlledLanes(tlsID)))
-
             ns_vehicle = 0
             ew_vehicle = 0
-            waiting_time = 0
+            waiting_time_total = 0
 
             # レーンごとの状況把握
             for lane in lanes:
                 vehicle_num = traci.lane.getLastStepVehicleNumber(lane)
                 lane_wait = traci.lane.getWaitingTime(lane)
-                waiting_time += lane_wait
+                waiting_time_total += lane_wait
 
                 lane_lower = lane.lower()
                 if "n" in lane_lower or "s" in lane_lower:
@@ -50,37 +49,39 @@ try:
                 elif "e" in lane_lower or "w" in lane_lower:
                     ew_vehicle += vehicle_num
 
-            if waiting_time > max_waiting:
-                max_waiting = waiting_time
-                max_tls = tlsID
-
             current_phase = traci.trafficlight.getPhase(tlsID)
 
-            # ---------------------------------
             # 動的信号制御ロジック (30ステップごと)
-            # ---------------------------------
-            if waiting_time > 40 and step % 30 == 0:
-                # 南北が激しく混雑（東西より3台以上多い）
+            if waiting_time_total > 40 and step % 30 == 0:
                 if ns_vehicle > ew_vehicle + 3:
                     if current_phase != 0:
-                        print(f"🚦 [{tlsID}] 南北優先制御へ切り替え")
                         traci.trafficlight.setPhase(tlsID, 0)
                     traci.trafficlight.setPhaseDuration(tlsID, 20)
-
-                # 東西が激しく混雑（南北より3台以上多い）
                 elif ew_vehicle > ns_vehicle + 3:
                     if current_phase != 2:
-                        print(f"🚦 [{tlsID}] 東西優先制御へ切り替え")
                         traci.trafficlight.setPhase(tlsID, 2)
                     traci.trafficlight.setPhaseDuration(tlsID, 20)
-            
-            # CSV保存
-            writer.writerow([step, tlsID, ns_vehicle, ew_vehicle, current_phase, waiting_time])
 
-        print(f"最大渋滞交差点: {max_tls} (待ち時間: {max_waiting})")
+        # 全車両の待ち時間と通過数を集計
+        vehicle_ids = traci.vehicle.getIDList()
+        for vid in vehicle_ids:
+            wait_time = traci.vehicle.getWaitingTime(vid)
+            step_waiting_times.append(wait_time)
+
+            road = traci.vehicle.getRoadID(vid)
+            if not road.startswith(":") and road != "":
+                passed_vehicles.add(vid)
+
+        # 統計データの計算
+        avg_wait = sum(step_waiting_times) / len(step_waiting_times) if step_waiting_times else 0
+        max_wait = max(step_waiting_times) if step_waiting_times else 0
+        throughput = len(passed_vehicles)
+
+        # CSV保存
+        writer.writerow([step, avg_wait, max_wait, throughput, 0])
         step += 1
 
 finally:
     csv_file.close()
     traci.close()
-    print("シミュレーション終了")
+    print("動的信号シミュレーション終了: traffic_log_actuated_tls.csv に保存されました")
