@@ -88,4 +88,4 @@ output_img = r"C:\Users\GLAB-PC002\Desktop\sumo_project\aim_enhanced_analysis.pn
 plt.savefig(output_img, dpi=300)
 plt.show()
 
-print("グラフ②を平均速度の推移に変更して保存しました！")
+print("保存しました！")
