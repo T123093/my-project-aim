@@ -29,6 +29,32 @@ try:
             for link_idx in list(reservations[tlsID].keys()):
                 if reservations[tlsID][link_idx]["end_time"] < current_time:
                     del reservations[tlsID][link_idx]
+        
+        vehicle_ids = traci.vehicle.getIDList()
+        step_waiting_times = []
+
+        for vid in vehicle_ids:
+            step_waiting_times.append(traci.vehicle.getWaitingTime(vid))
+            road = traci.vehicle.getRoadID(vid)
+            if not road.startswith(":") and road != "":
+                passed_vehicles.add(vid)
+            
+            next_tls = traci.vehicle.getNextTLS(vid)
+            if next_tls:
+                tls_id, link_idx, dist, state = next_tls[0]
+                if dist < 50:
+                    target_res = reservations[tls_id]
+                    if link_idx in target_res and target_res[link_idx]["vehicle"] != vid:
+                        traci.vehicle.slowDown(vid, 2.0, 1.0)
+                        total_conflicts += 1
+                    else:
+                        target_res[link_idx] = {"vehicle": vid, "end_time": current_time + 5.0}
+
+        avg_wait = sum(step_waiting_times) / len(step_waiting_times) if step_waiting_times else 0
+        max_wait = max(step_waiting_times) if step_waiting_times else 0
+        writer.writerow([step, avg_wait, max_wait, len(passed_vehicles), total_conflicts])
+
+        step += 1
 
 finally:
     csv_file.close()
