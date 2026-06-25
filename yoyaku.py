@@ -10,6 +10,11 @@ sumoCmd = [sumoBinary, "-c", r"C:\Users\GLAB-PC002\Desktop\sumo_project\test.sum
 traci.start(sumoCmd)
 tlsIDs = traci.trafficlight.getIDList()
 
+
+for tlsID in tlsIDs:
+    logic = traci.trafficlight.getAllProgramLogics(tlsID)[0]
+    traci.trafficlight.setRedYellowGreenState(tlsID, "G" * len(logic.phases[0].state))
+
 reservations = {tlsID: {} for tlsID in tlsIDs}
 
 csv_file = open(r"C:\Users\GLAB-PC002\Desktop\sumo_project\traffic_log_aim_multi.csv", "w", newline="", encoding="utf-8")
@@ -59,4 +64,4 @@ try:
 finally:
     csv_file.close()
     traci.close()
-    print("複数交差点AIMシミュレーション")
+    print("複数交差点AIMシミュレーション（信号無効化版）が完了しました。")
