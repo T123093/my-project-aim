@@ -23,3 +23,24 @@ tlsIDs = traci.trafficlight.getIDList()
 #----------
 #すべての信号を無効化
 #----------
+for tlsID in tlsIDs:
+    try:
+        logic = traci.trafficlight.getAllProgramLogics(tlsID)[0]
+        num_links = len(logic.phases[0].state)
+        #全方向を緑に
+        traci.trafficlight.setRedYellowGreenState(tlsID, "G" * num_links)
+    except Exception as e:
+        continue
+
+#ログ用のCSV作成
+csv_path = r"C:\Users\GLAB-PC002\Desktop\sumo_project\pt3\traffic_log_aim_real.csv"
+csv_file = open(csv_path, "w", newline="", encoding="utf-8")
+writer = csv.writer(csv_file)
+writer.writerow(["time_s", "avg_waiting_time", "max_waiting_time", "throughput", "conflict_count"])
+
+try:
+    #分散型予約管理用
+    distributed_reservations = {}
+
+    conflict_count_total = 0    #累積予約発生回数
+    passed_vehicles = set() #交差点を通過した車両の累積管理
