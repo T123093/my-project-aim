@@ -173,3 +173,31 @@ def analyze_and_plot():
     #グラフ描画
     plt.figure(figsize=(10, 6))
     plt.rcParams["font.size"] = 12
+
+    plt.plot(df_tls["step"], df_tls["avg_waiting_time"], label="TLS（通常信号）", color="red", linestyle="--", linewidth=1.5)
+    plt.plot(df_aim["step"], df_aim["avg_waiting_time"], label="AIM（提案手法）", color="blue", linewidth=2.0)
+    plt.title("平均待ち時間の比較（TLS vs AIM）", fontsize=14, fontweight="bold")
+    plt.xlabel("シミュレーション経過時間（秒）", fontsize=12)
+    plt.ylabel("平均待ち時間（秒）", fontsize=12)
+    plt.grid(True, linestyle=":", alpha=0.6)
+    plt.legend(fontsize=12)
+
+    plt.annotate(f"待ち時間 {wait_reduction:.1f}% 削減",
+                 xy=(0.05, 0.85), xycoords='axes fraction',
+                 fontsize=12, fontweight='bold',
+                 bbox=dict(boxstyle="round,pad=0.5", fc="yellow", ec="black", lw=1))
+
+    plt.tight_layout()
+    plt.savefig(graph_image_path, dpi=300)
+    print(f"グラフを'{graph_image_path}' に保存しました。")
+
+#--------------------------------------
+#メイン処理
+#--------------------------------------
+if __name__ == "__main__":
+    #1.AIMを実行
+    run_aim_simulation()
+    #2.TLSを実行
+    run_tls_simulation()
+    #3.結果を集計してグラフに
+    analyze_and_plot()
