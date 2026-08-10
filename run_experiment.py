@@ -3,6 +3,7 @@ import time
 import csv
 import traci
 import pandas as pd
+import japanize_matplotlib
 import matplotlib.pyplot as plt
 
 # SUMO tools を追加

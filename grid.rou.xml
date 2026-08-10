@@ -4,7 +4,7 @@
 <configuration>
     <net-file value="grid.net.xml"/>
     <route-file value="grid.rou.xml"/>
-    <period value="2.0"/>
+    <period value="0.5"/>
 </configuration>
 -->
 

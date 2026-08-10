@@ -6,7 +6,7 @@
     <route-file value="car.rou.xml"/>
     <random value="True"/>
     <end value="200.0"/>
-    <period value="2.0"/>
+    <period value="0.5"/>
 </configuration>
 -->
 
