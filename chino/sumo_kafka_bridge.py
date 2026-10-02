@@ -7,7 +7,7 @@ import threading
 sys.path.append(r"C:\Program Files (x86)\Eclipse\Sumo\tools")
 
 SUMO_BINARY = r"C:\Program Files (x86)\Eclipse\Sumo\bin\sumo-gui.exe"
-SUMO_CONFIG = r"C:\Users\GLAB-PC002\Desktop\sumo_project\chino.sumocfg"
+SUMO_CONFIG = r"C:\Users\GLAB-PC002\Desktop\sumo_project\chino\chino.sumocfg"
 
 KAFKA_BROKER = "localhost:9092"
 TELEMETRY_TOPIC = "vehicle-telemetry"

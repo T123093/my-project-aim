@@ -1,0 +1,4 @@
+edge_id,hourly_volume,vehicle_type_ratio_heavy
+edge_in_r20_north,850,0.15
+edge_in_r20_south,720,0.12
+edge_in_r152_east,450,0.08
