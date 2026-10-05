@@ -2,10 +2,10 @@
 <routes>
     <vType id="passenger" accel="2.6" decel="4.5" length="4.5" maxSpeed="14.0"/>
     <vType id="heavy_truck" accel="1.2" decel="4.0" length="10.0" maxSpeed="10.0"/>
-    <flow id="flow_passenger_0" type="passenger" from="edge_in_r20_north" begin="0" end="3600" vehsPerHour="723" departLane="free" departSpeed="max"/>
-    <flow id="flow_heavy_0" type="heavy_truck" from="edge_in_r20_north" begin="0" end="3600" vehsPerHour="127" departLane="free" departSpeed="max"/>
-    <flow id="flow_passenger_1" type="passenger" from="edge_in_r20_south" begin="0" end="3600" vehsPerHour="634" departLane="free" departSpeed="max"/>
-    <flow id="flow_heavy_1" type="heavy_truck" from="edge_in_r20_south" begin="0" end="3600" vehsPerHour="86" departLane="free" departSpeed="max"/>
-    <flow id="flow_passenger_2" type="passenger" from="edge_in_r152_east" begin="0" end="3600" vehsPerHour="414" departLane="free" departSpeed="max"/>
-    <flow id="flow_heavy_2" type="heavy_truck" from="edge_in_r152_east" begin="0" end="3600" vehsPerHour="36" departLane="free" departSpeed="max"/>
+    <flow id="flow_passenger_0" type="passenger" from="-1058535151" begin="0" end="3600" vehsPerHour="723" departLane="free" departSpeed="max"/>
+    <flow id="flow_heavy_0" type="heavy_truck" from="-1058535151" begin="0" end="3600" vehsPerHour="127" departLane="free" departSpeed="max"/>
+    <flow id="flow_passenger_1" type="passenger" from="-1058803570#0" begin="0" end="3600" vehsPerHour="634" departLane="free" departSpeed="max"/>
+    <flow id="flow_heavy_1" type="heavy_truck" from="-1058803570#0" begin="0" end="3600" vehsPerHour="86" departLane="free" departSpeed="max"/>
+    <flow id="flow_passenger_2" type="passenger" from="-1060463246#0" begin="0" end="3600" vehsPerHour="414" departLane="free" departSpeed="max"/>
+    <flow id="flow_heavy_2" type="heavy_truck" from="-1060463246#0" begin="0" end="3600" vehsPerHour="36" departLane="free" departSpeed="max"/>
 </routes>
