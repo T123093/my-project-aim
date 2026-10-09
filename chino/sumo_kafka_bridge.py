@@ -98,4 +98,8 @@ def run_simulation():
     print("シミュレーションおよびデータ保存が完了しました！")
 
 if __name__ == "__main__":
+    import sys
+
+    tag = sys.argv[1] if len(sys.argv) > 1 else "default"
+    
     run_simulation()

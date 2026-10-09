@@ -1,83 +1,87 @@
 import xml.etree.ElementTree as ET
 from xml.dom import minidom
+import sys
 
-# 1. chino.net.xml から普通車が走行可能なエッジIDのみを自動抽出
-net_tree = ET.parse("chino.net.xml")
-net_root = net_tree.getroot()
+def generate_route_file(volume_level="medium"):
+    # 交通量レベルに応じた設定（1方向あたりの台数/時）
+    volumes = {
+        "low": [300, 250, 200],
+        "medium": [850, 720, 450],
+        "high": [1500, 1300, 1100]
+    }
+    
+    selected_volumes = volumes.get(volume_level.lower(), volumes["medium"])
+    print(f"--- 交通量レベル [{volume_level.upper()}] でルートファイルを生成します ---")
 
-passenger_edges = []
+    # 1. chino.net.xml から普通車が通行可能なエッジを取得
+    net_tree = ET.parse("chino.net.xml")
+    net_root = net_tree.getroot()
 
-for edge in net_root.findall("edge"):
-    edge_id = edge.get("id")
-    # 内部交差点エッジ（:で始まるもの）を除外
-    if not edge_id or edge_id.startswith(":") or edge.get("function") == "internal":
-        continue
+    passenger_edges = []
+    for edge in net_root.findall("edge"):
+        edge_id = edge.get("id")
+        if not edge_id or edge_id.startswith(":") or edge.get("function") == "internal":
+            continue
 
-    # エッジ内の各レーンをチェックし、普通車が通行可能か確認
-    has_passenger_lane = False
-    for lane in edge.findall("lane"):
-        allow = lane.get("allow")
-        disallow = lane.get("disallow")
+        has_passenger_lane = False
+        for lane in edge.findall("lane"):
+            allow = lane.get("allow")
+            disallow = lane.get("disallow")
+            if (not disallow or "passenger" not in disallow) and (not allow or "passenger" in allow):
+                has_passenger_lane = True
+                break
 
-        # disallowにpassengerが含まれておらず、allowが未設定（全許可）またはpassengerを含む場合
-        if (not disallow or "passenger" not in disallow) and (not allow or "passenger" in allow):
-            has_passenger_lane = True
-            break
+        if has_passenger_lane:
+            passenger_edges.append(edge_id)
 
-    if has_passenger_lane:
-        passenger_edges.append(edge_id)
+    if not passenger_edges:
+        print("エラー: 通行可能なエッジが見つかりませんでした。")
+        return
 
-if not passenger_edges:
-    print("エラー: chino.net.xml から普通車が走行可能なエッジが見つかりませんでした。")
-    exit(1)
+    # 2. XML 要素の作成
+    routes = ET.Element("routes")
+    ET.SubElement(routes, "vType", id="passenger", accel="2.6", decel="4.5", length="4.5", maxSpeed="14.0")
+    ET.SubElement(routes, "vType", id="heavy_truck", accel="1.2", decel="4.0", length="10.0", maxSpeed="10.0")
 
-print(f"マップから普通車が通行可能な {len(passenger_edges)} 個のエッジを検出しました。")
+    sample_ratios = [0.15, 0.12, 0.08]
 
-# 2. XMLルート要素の作成
-routes = ET.Element("routes")
+    for idx, edge_id in enumerate(passenger_edges[:3]):
+        total_volume = selected_volumes[idx % len(selected_volumes)]
+        heavy_ratio = sample_ratios[idx % len(sample_ratios)]
 
-# 車種定義（普通車・大型車）
-ET.SubElement(routes, "vType", id="passenger", accel="2.6", decel="4.5", length="4.5", maxSpeed="14.0")
-ET.SubElement(routes, "vType", id="heavy_truck", accel="1.2", decel="4.0", length="10.0", maxSpeed="10.0")
+        heavy_volume = int(total_volume * heavy_ratio)
+        passenger_volume = total_volume - heavy_volume
 
-# 通行可能なエッジ（先頭から最大3つ）を使用して Flow を作成
-sample_volumes = [850, 720, 450]
-sample_ratios = [0.15, 0.12, 0.08]
+        if passenger_volume > 0:
+            ET.SubElement(routes, "flow", {
+                "id": f"flow_passenger_{idx}",
+                "type": "passenger",
+                "from": edge_id,
+                "begin": "0",
+                "end": "3600",
+                "vehsPerHour": str(passenger_volume),
+                "departLane": "free",
+                "departSpeed": "max"
+            })
 
-for idx, edge_id in enumerate(passenger_edges[:3]):
-    total_volume = sample_volumes[idx % len(sample_volumes)]
-    heavy_ratio = sample_ratios[idx % len(sample_ratios)]
+        if heavy_volume > 0:
+            ET.SubElement(routes, "flow", {
+                "id": f"flow_heavy_{idx}",
+                "type": "heavy_truck",
+                "from": edge_id,
+                "begin": "0",
+                "end": "3600",
+                "vehsPerHour": str(heavy_volume),
+                "departLane": "free",
+                "departSpeed": "max"
+            })
 
-    heavy_volume = int(total_volume * heavy_ratio)
-    passenger_volume = total_volume - heavy_volume
+    xml_str = minidom.parseString(ET.tostring(routes)).toprettyxml(indent="    ")
+    with open("chino.rou.xml", "w", encoding="utf-8") as f:
+        f.write(xml_str)
 
-    if passenger_volume > 0:
-        ET.SubElement(routes, "flow", {
-            "id": f"flow_passenger_{idx}",
-            "type": "passenger",
-            "from": edge_id,
-            "begin": "0",
-            "end": "3600",
-            "vehsPerHour": str(passenger_volume),
-            "departLane": "free",
-            "departSpeed": "max"
-        })
+    print(f"chino.rou.xml の生成完了 (Level: {volume_level})")
 
-    if heavy_volume > 0:
-        ET.SubElement(routes, "flow", {
-            "id": f"flow_heavy_{idx}",
-            "type": "heavy_truck",
-            "from": edge_id,
-            "begin": "0",
-            "end": "3600",
-            "vehsPerHour": str(heavy_volume),
-            "departLane": "free",
-            "departSpeed": "max"
-        })
-
-# 書き出し
-xml_str = minidom.parseString(ET.tostring(routes)).toprettyxml(indent="    ")
-with open("chino.rou.xml", "w", encoding="utf-8") as f:
-    f.write(xml_str)
-
-print("走行可能なエッジを反映した chino.rou.xml の再生成が完了しました！")
+if __name__ == "__main__":
+    level = sys.argv[1] if len(sys.argv) > 1 else "medium"
+    generate_route_file(level)
