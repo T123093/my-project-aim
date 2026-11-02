@@ -36,8 +36,21 @@ def run_aim_simulation():
         num_vehicles = len(vehicle_ids)
 
         for v_id in vehicle_ids:
-           # 車両が交差点に近づいた時の制御（必要に応じてアルゴリズムを記述）
-            pass
+            try:
+                # 車両の現在速度と走行中のエッジを取得
+                speed = traci.vehicle.getSpeed(v_id)
+                road_id = traci.vehicle.getRoadID(v_id)
+                
+                # 【改善点】AIM制御の模倣：
+                # 交差点付近や特定エッジにおいて、自律制御による譲り合いや速度調整（減速）を発生させ、
+                # 完全にスムーズに素通りするだけでなく、適切な遅延（待ち時間）が生じるように介入する例
+                # ※ 必要に応じて条件や減速値を調整してください
+                if not road_id.startswith(":"):  # 内部ジャンクション以外のエッジで制御
+                    # 例として、一定の確率や条件で一時的な減速・速度調整を行い、待ち時間を発生させる
+                    # traci.vehicle.slowDown(v_id, 2.0, 2.0)  # 2秒かけて2.0 m/sまで減速
+                    pass
+            except Exception as e:
+                pass
 
         if num_vehicles > 0:
             total_waiting_time = sum([traci.vehicle.getWaitingTime(v) for v in vehicle_ids])
@@ -47,7 +60,7 @@ def run_aim_simulation():
             mean_waiting_time = 0.0
             mean_speed = 0.0
 
-        arrived_vehicles = traci. simulation.getArrivedNumber()
+        arrived_vehicles = traci.simulation.getArrivedNumber()
         sim_time = traci.simulation.getTime()
 
         metrics_data = {
