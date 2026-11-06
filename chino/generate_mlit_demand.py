@@ -4,17 +4,17 @@ import sys
 import random
 
 def generate_route_file(volume_level="medium"):
-    #交通量レベルに応じた設定(1方向あたりの台数/時)
+    # 交通量レベルに応じた設定（全体にバランスよく配置するための中庸なボリューム）
     volumes = {
-        "low": [300, 250, 200],
-        "medium": [850, 720, 450],
-        "high": [1500, 1300, 1100]
+        "low": [200, 150, 100],
+        "medium": [600, 400, 300],
+        "high": [2500, 2000, 1500]
     }
-
+    
     selected_volumes = volumes.get(volume_level.lower(), volumes["medium"])
-    print(f"--- 交通量レベル [{volume_level.upper()}] でルートファイルを生成します ---")
+    print(f"--- 交通量レベル [{volume_level.upper()}] (ネットワーク全体・バランス型) でルートファイルを生成します ---")
 
-    # 1. chino.net.xml から普通車が通行可能なエッジを取得
+    # 1. chino.net.xml から通行可能なエッジを幅広く抽出
     net_tree = ET.parse("chino.net.xml")
     net_root = net_tree.getroot()
 
@@ -24,6 +24,7 @@ def generate_route_file(volume_level="medium"):
         if not edge_id or edge_id.startswith(":") or edge.get("function") == "internal":
             continue
 
+        # 普通車が通れるかチェック
         has_passenger_lane = False
         for lane in edge.findall("lane"):
             allow = lane.get("allow")
@@ -35,32 +36,29 @@ def generate_route_file(volume_level="medium"):
         if has_passenger_lane:
             passenger_edges.append(edge_id)
 
+    print(f"通行可能な全エッジ数: {len(passenger_edges)}本")
+
     if not passenger_edges:
-        print("エラー: 通行可能なエッジが見つかりませんでした。")
+        print("エラー: 有効なエッジが見つかりませんでした。")
         return
 
-    # 【改善】発生エッジが少なすぎないよう、対象数を大幅に拡大（最大30エッジ、または利用可能な全エッジ）
-    # ランダムに抽出することでネットワーク全体に交通流を分散させます
-    target_edges = passenger_edges[:]
-    random.shuffle(target_edges)
-    target_edges = target_edges[:30]  # 必要に応じて数を調整（例: 30エッジ）
+    # 発生源が極端に偏らないよう、適度な数（例: 最大30本）をランダムに選択
+    num_sources = min(30, len(passenger_edges))
+    target_edges = random.sample(passenger_edges, num_sources)
+    print(f"選択された発生源エッジ数: {len(target_edges)}本")
 
     # 2. XML 要素の作成
     routes = ET.Element("routes")
     ET.SubElement(routes, "vType", id="passenger", accel="2.6", decel="4.5", length="4.5", maxSpeed="14.0")
     ET.SubElement(routes, "vType", id="heavy_truck", accel="1.2", decel="4.0", length="10.0", maxSpeed="10.0")
 
-    sample_ratios = [0.15, 0.12, 0.08]
-
-    # 拡張した複数のエッジに対してそれぞれフローを生成
+    # 選択された各エッジに対してフローを生成
     for idx, edge_id in enumerate(target_edges):
         base_vol = selected_volumes[idx % len(selected_volumes)]
-        # エッジ数が増えたため、1エッジあたりの交通量が過剰にならないよう適度にスケーリング（必要に応じて調整）
-        total_volume = max(50, int(base_vol * 0.5)) 
-        heavy_ratio = sample_ratios[idx % len(sample_ratios)]
+        heavy_ratio = 0.1  # 大型車の割合を10%程度に設定
 
-        heavy_volume = int(total_volume * heavy_ratio)
-        passenger_volume = total_volume - heavy_volume
+        heavy_volume = int(base_vol * heavy_ratio)
+        passenger_volume = base_vol - heavy_volume
 
         if passenger_volume > 0:
             ET.SubElement(routes, "flow", {
@@ -90,8 +88,8 @@ def generate_route_file(volume_level="medium"):
     with open("chino.rou.xml", "w", encoding="utf-8") as f:
         f.write(xml_str)
 
-    print(f"chino.rou.xml の生成完了 (Level: {volume_level}, 対象エッジ数: {len(target_edges)})")
+    print(f"chino.rou.xml の生成完了 (Level: {volume_level})")
 
 if __name__ == "__main__":
     level = sys.argv[1] if len(sys.argv) > 1 else "medium"
-    generate_route_file(level)        
+    generate_route_file(level)
