@@ -55,7 +55,7 @@ def run_aim_simulation():
                     custom_waiting_times[v_id] = 0.0
                 
                 # 速度が 1.0 m/s 未満（微速・滞留状態）の場合、1ステップ（1秒）あたりの滞留時間を加算
-                if speed < 1.0:
+                if speed < 2.5:
                     custom_waiting_times[v_id] += 1.0
 
                 # 内部ジャンクション以外のエッジでのAIM制御（必要に応じて処理を追加）

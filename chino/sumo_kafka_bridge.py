@@ -37,39 +37,35 @@ def run_simulation(tag="default"):
     print(f"SUMO シミュレーションを開始しました (Tag: {tag})。")
 
     step = 0
-    # RQ出力用にデータ全件を保持するリスト
     metrics_history = []
-    #車両ごとの独自累積待ち時間（微速・滞留時間）を保持する辞書
     custom_waiting_times = {}
 
     while traci.simulation.getMinExpectedNumber() > 0:
+        # 1ステップ進行
         traci.simulationStep()
+        sim_time = traci.simulation.getTime()
         step += 1
 
         vehicle_ids = traci.vehicle.getIDList()
         num_vehicles = len(vehicle_ids)
 
-        #1. ネットワークから退出した車両を辞書から削除(メモリ削除)
+        # 1. ネットワークから退出した車両を辞書から削除
         current_v_set = set(vehicle_ids)
         tracked_v_set = set(custom_waiting_times.keys())
         for finished_v in tracked_v_set - current_v_set:
             del custom_waiting_times[finished_v]
 
-        #2. 各車両の速度をチェックし、闘値未満なら滞留時間を累積
+        # 2. 各車両の速度をチェックし、2.5 m/s 未満（徐行・渋滞）なら滞留時間を累積
         for v_id in vehicle_ids:
             if v_id not in custom_waiting_times:
                 custom_waiting_times[v_id] = 0.0
 
             speed = traci.vehicle.getSpeed(v_id)
-
-            # 速度が1.0m/s 未満(微速・渋滞)の場合をカウントする
-            # 1ステップ(通常1秒) あたりの時間を加算
-            if speed < 1.0:
+            if speed < 2.5:
                 custom_waiting_times[v_id] += 1.0
         
-#3. 評価指標の計算
+        # 3. 評価指標の計算
         if num_vehicles > 0:
-            # 走行中の全車両の「独自累積待ち時間（1.0 m/s未満の滞留時間）」の合計を計算
             total_waiting_time = sum(custom_waiting_times.get(v_id, 0.0) for v_id in vehicle_ids)
             mean_waiting_time = total_waiting_time / num_vehicles
             mean_speed = sum([traci.vehicle.getSpeed(v) for v in vehicle_ids]) / num_vehicles
@@ -78,8 +74,8 @@ def run_simulation(tag="default"):
             mean_speed = 0.0
 
         arrived_vehicles = traci.simulation.getArrivedNumber()
-        sim_time = traci.simulation.getTime()
 
+        # metrics_data の構築
         metrics_data = {
             "step": step,
             "sim_time": sim_time,
@@ -89,11 +85,23 @@ def run_simulation(tag="default"):
             "mean_speed_m_s": round(mean_speed, 2)
         }
 
-        # Kafka へストリーミング送信
-        producer.send('chino-traffic-metrics', value=metrics_data)
-
-        # リストへ保存
+        # ★ リストへ保存（これが抜けていたためファイルが空になっていました）
         metrics_history.append(metrics_data)
+
+        # Kafka へストリーミング送信
+        try:
+            producer.send('chino-traffic-metrics', value=metrics_data)
+        except Exception as e:
+            print(f"Kafka送信エラー: {e}")
+
+        # コンソール進捗表示
+        if vehicle_ids:
+            speeds = [traci.vehicle.getSpeed(v) for v in vehicle_ids]
+            min_speed = min(speeds)
+            slow_vehicles = [v for v, s in zip(vehicle_ids, speeds) if s < 2.5]
+            
+            if int(sim_time) % 10 == 0:
+                print(f"[DEBUG t={sim_time}s] 車両数:{len(vehicle_ids)}台 | 最小速度:{min_speed:.2f}m/s | 2.5未満(徐行):{len(slow_vehicles)}台")
 
         if step % 100 == 0:
             print(f"[Step {step}] 走行台数: {num_vehicles}台 | 平均待ち時間: {mean_waiting_time:.2f}秒")
@@ -102,17 +110,15 @@ def run_simulation(tag="default"):
     producer.flush()
 
     # =========================================================
-    # ★ エクセル / CSV への出力処理（tag反映） ★
+    # ★ エクセル / CSV への出力処理 ★
     # =========================================================
     print("\n研究データをファイルへ書き出しています...")
     df = pd.DataFrame(metrics_history)
 
-    # 1. Excel形式 (.xlsx) での保存
     excel_filename = f"research_metrics_{tag}.xlsx"
     df.to_excel(excel_filename, index=False, engine='openpyxl')
     print(f"Excel ファイルを出力しました: {excel_filename}")
 
-    # 2. CSV形式 (.csv) での保存（バックアップ・汎用用）
     csv_filename = f"research_metrics_{tag}.csv"
     df.to_csv(csv_filename, index=False, encoding="utf-8-sig")
     print(f"CSV ファイルを出力しました: {csv_filename}")
@@ -121,6 +127,5 @@ def run_simulation(tag="default"):
 
 if __name__ == "__main__":
     import sys
-
     tag = sys.argv[1] if len(sys.argv) > 1 else "TLS"
     run_simulation(tag)

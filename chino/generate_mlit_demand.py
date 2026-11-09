@@ -43,7 +43,7 @@ def generate_route_file(volume_level="medium"):
         return
 
     # 発生源が極端に偏らないよう、適度な数（例: 最大30本）をランダムに選択
-    num_sources = min(30, len(passenger_edges))
+    num_sources = min(35, len(passenger_edges))
     target_edges = random.sample(passenger_edges, num_sources)
     print(f"選択された発生源エッジ数: {len(target_edges)}本")
 
