@@ -38,11 +38,11 @@ def generate_route_file(volume_level="medium"):
 
     print(f"通行可能な全エッジ数: {len(passenger_edges)}本")
 
-    if not passenger_edges:
-        print("エラー: 有効なエッジが見つかりませんでした。")
+    if len(passenger_edges) < 2:
+        print("エラー: 経路を生成するのに十分なエッジが見つかりませんでした。")
         return
 
-    # 発生源が極端に偏らないよう、適度な数（例: 最大30本）をランダムに選択
+    # 発生源が極端に偏らないよう、適度な数（例: 最大35本）をランダムに選択
     num_sources = min(35, len(passenger_edges))
     target_edges = random.sample(passenger_edges, num_sources)
     print(f"選択された発生源エッジ数: {len(target_edges)}本")
@@ -60,6 +60,12 @@ def generate_route_file(volume_level="medium"):
         heavy_volume = int(base_vol * heavy_ratio)
         passenger_volume = base_vol - heavy_volume
 
+        # 出発地 (from) とは異なるエッジを目的地 (to) としてランダムに選択
+        available_destinations = [e for e in passenger_edges if e != edge_id]
+        if not available_destinations:
+            continue
+        dest_edge = random.choice(available_destinations)
+
         if passenger_volume > 0:
             ET.SubElement(routes, "flow", {
                 "id": f"flow_passenger_{idx}",
@@ -73,6 +79,8 @@ def generate_route_file(volume_level="medium"):
             })
 
         if heavy_volume > 0:
+            # 別の目的地を割り当て
+            dest_edge_heavy = random.choice(available_destinations)
             ET.SubElement(routes, "flow", {
                 "id": f"flow_heavy_{idx}",
                 "type": "heavy_truck",

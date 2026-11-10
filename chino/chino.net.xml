@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<!-- generated on 2026-11-09T15:33:32.576437+09:00 by Eclipse SUMO netedit 1.26.0
+<!-- generated on 2026-11-10T15:39:15.792447+09:00 by Eclipse SUMO netedit 1.26.0
 <neteditConfiguration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/neteditConfiguration.xsd">
 
     <input>
@@ -41991,6 +41991,11 @@
         <phase duration="40" state="rrrGGgGrr"/>
         <phase duration="5"  state="rrryyyGrr"/>
     </tlLogic>
+    <tlLogic id="1546594127" type="static" programID="0" offset="0">
+        <phase duration="82" state="GG"/>
+        <phase duration="3"  state="yy"/>
+        <phase duration="5"  state="rr"/>
+    </tlLogic>
     <tlLogic id="1546669055" type="static" programID="0" offset="0">
         <phase duration="40" state="GGgGggrrr"/>
         <phase duration="5"  state="Gyyyyyrrr"/>
@@ -45867,7 +45872,7 @@
         <request index="7" response="000000000" foes="000011011" cont="0"/>
         <request index="8" response="000000000" foes="000010111" cont="0"/>
     </junction>
-    <junction id="1546594127" type="priority" x="1119.71" y="2451.73" incLanes="-141284893#0_0 379045163_0" intLanes=":1546594127_0_0 :1546594127_1_0" shape="1120.43,2454.85 1119.30,2448.55 1119.07,2448.60 1118.99,2448.61 1118.91,2448.63 1118.68,2448.69">
+    <junction id="1546594127" type="traffic_light" x="1119.71" y="2451.73" incLanes="-141284893#0_0 379045163_0" intLanes=":1546594127_0_0 :1546594127_1_0" shape="1120.43,2454.85 1119.30,2448.55 1119.07,2448.60 1118.99,2448.61 1118.91,2448.63 1118.68,2448.69">
         <request index="0" response="00" foes="00" cont="0"/>
         <request index="1" response="00" foes="00" cont="0"/>
     </junction>
@@ -56981,7 +56986,7 @@
     <connection from="-141284891" to="141284891" fromLane="0" toLane="0" via=":1546592080_15_0" dir="t" state="m"/>
     <connection from="-141284892" to="141284254#0" fromLane="0" toLane="0" via=":1546593576_2_0" dir="r" state="M"/>
     <connection from="-141284892" to="141284577#0" fromLane="0" toLane="0" via=":1546593576_3_0" dir="s" state="m"/>
-    <connection from="-141284893#0" to="-379045163" fromLane="0" toLane="0" via=":1546594127_0_0" dir="s" state="M"/>
+    <connection from="-141284893#0" to="-379045163" fromLane="0" toLane="0" via=":1546594127_0_0" tl="1546594127" linkIndex="0" dir="s" state="O"/>
     <connection from="-141284893#1" to="-141284893#0" fromLane="0" toLane="0" via=":1546594058_0_0" dir="s" state="M"/>
     <connection from="-141284900" to="141284167" fromLane="0" toLane="0" via=":1546592024_3_0" dir="r" state="M"/>
     <connection from="-141284900" to="-141284551" fromLane="0" toLane="0" via=":1546592024_4_0" dir="s" state="M"/>
@@ -63189,7 +63194,7 @@
     <connection from="379045162#2" to="687255039#0" fromLane="0" toLane="0" via=":835443678_0_0" tl="joinedS_6441778613_6441778615_835443678" linkIndex="4" dir="r" state="o"/>
     <connection from="379045162#2" to="-687255033#2" fromLane="0" toLane="0" via=":835443678_1_0" tl="joinedS_6441778613_6441778615_835443678" linkIndex="5" dir="l" state="o"/>
     <connection from="379045162#2" to="-379045162#2" fromLane="0" toLane="0" via=":835443678_2_0" tl="joinedS_6441778613_6441778615_835443678" linkIndex="6" dir="t" state="o"/>
-    <connection from="379045163" to="141284893#0" fromLane="0" toLane="0" via=":1546594127_1_0" dir="s" state="M"/>
+    <connection from="379045163" to="141284893#0" fromLane="0" toLane="0" via=":1546594127_1_0" tl="1546594127" linkIndex="1" dir="s" state="O"/>
     <connection from="379045164" to="379045166" fromLane="0" toLane="0" via=":1546668970_0_0" dir="s" state="M"/>
     <connection from="379045166" to="-141295201#1" fromLane="0" toLane="0" via=":1546668922_0_0" dir="r" state="M"/>
     <connection from="379045166" to="-687264032" fromLane="0" toLane="0" via=":1546668922_1_0" dir="s" state="M"/>

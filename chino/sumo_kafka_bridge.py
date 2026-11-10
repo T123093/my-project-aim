@@ -6,7 +6,7 @@ import pandas as pd
 from kafka import KafkaProducer
 from kafka.errors import KafkaError
 
-# 1. パスの設定
+# 1. パスの設定（共通の chino.sumocfg を使用）
 script_dir = os.path.dirname(os.path.abspath(__file__))
 sumocfg_path = os.path.join(script_dir, "chino.sumocfg")
 
@@ -32,7 +32,7 @@ if not producer:
 # 3. SUMO 起動コマンド
 sumocmd = ["sumo-gui", "-c", sumocfg_path]
 
-def run_simulation(tag="default"):
+def run_simulation(tag="TLS"):
     traci.start(sumocmd)
     print(f"SUMO シミュレーションを開始しました (Tag: {tag})。")
 
@@ -85,7 +85,7 @@ def run_simulation(tag="default"):
             "mean_speed_m_s": round(mean_speed, 2)
         }
 
-        # ★ リストへ保存（これが抜けていたためファイルが空になっていました）
+        # リストへ保存
         metrics_history.append(metrics_data)
 
         # Kafka へストリーミング送信
@@ -101,10 +101,10 @@ def run_simulation(tag="default"):
             slow_vehicles = [v for v, s in zip(vehicle_ids, speeds) if s < 2.5]
             
             if int(sim_time) % 10 == 0:
-                print(f"[DEBUG t={sim_time}s] 車両数:{len(vehicle_ids)}台 | 最小速度:{min_speed:.2f}m/s | 2.5未満(徐行):{len(slow_vehicles)}台")
+                print(f"[TLS DEBUG t={sim_time}s] 車両数:{len(vehicle_ids)}台 | 最小速度:{min_speed:.2f}m/s | 2.5未満(徐行):{len(slow_vehicles)}台")
 
         if step % 100 == 0:
-            print(f"[Step {step}] 走行台数: {num_vehicles}台 | 平均待ち時間: {mean_waiting_time:.2f}秒")
+            print(f"[TLS Step {step}] 走行台数: {num_vehicles}台 | 平均待ち時間: {mean_waiting_time:.2f}秒")
 
     traci.close()
     producer.flush()
@@ -112,7 +112,7 @@ def run_simulation(tag="default"):
     # =========================================================
     # ★ エクセル / CSV への出力処理 ★
     # =========================================================
-    print("\n研究データをファイルへ書き出しています...")
+    print("\n[TLS] 研究データをファイルへ書き出しています...")
     df = pd.DataFrame(metrics_history)
 
     excel_filename = f"research_metrics_{tag}.xlsx"
@@ -123,7 +123,7 @@ def run_simulation(tag="default"):
     df.to_csv(csv_filename, index=False, encoding="utf-8-sig")
     print(f"CSV ファイルを出力しました: {csv_filename}")
 
-    print("シミュレーションおよびデータ保存が完了しました！")
+    print("[TLS] シミュレーションおよびデータ保存が完了しました！")
 
 if __name__ == "__main__":
     import sys
