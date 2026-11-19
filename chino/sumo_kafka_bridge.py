@@ -4,7 +4,6 @@ import time
 import traci
 import pandas as pd
 from kafka import KafkaProducer
-from kafka.errors import KafkaError
 
 # 1. パスの設定（共通の chino.sumocfg を使用）
 script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -16,9 +15,9 @@ for i in range(10):
     try:
         print(f"Kafka ブローカーへ接続試行中... ({i+1}/10)")
         producer = KafkaProducer(
-            bootstrap_servers=['localhost:9092'],
-            value_serializer=lambda v: json.dumps(v).encode('utf-8'),
-            request_timeout_ms=10000
+            bootstrap_servers=["localhost:9092"],
+            value_serializer=lambda v: json.dumps(v).encode("utf-8"),
+            request_timeout_ms=10000,
         )
         print("Kafka 接続成功！")
         break
@@ -32,16 +31,17 @@ if not producer:
 # 3. SUMO 起動コマンド
 sumocmd = ["sumo-gui", "-c", sumocfg_path]
 
+
 def run_simulation(tag="TLS"):
     traci.start(sumocmd)
-    print(f"SUMO シミュレーションを開始しました (Tag: {tag})。")
+    delta_t = traci.simulation.getDeltaT()
+    print(f"SUMO シミュレーションを開始しました (Tag: {tag}, dt={delta_t}s)。")
 
     step = 0
     metrics_history = []
     custom_waiting_times = {}
 
     while traci.simulation.getMinExpectedNumber() > 0:
-        # 1ステップ進行
         traci.simulationStep()
         sim_time = traci.simulation.getTime()
         step += 1
@@ -49,83 +49,73 @@ def run_simulation(tag="TLS"):
         vehicle_ids = traci.vehicle.getIDList()
         num_vehicles = len(vehicle_ids)
 
-        # 1. ネットワークから退出した車両を辞書から削除
+        # 退出した車両の滞留時間データを削除
         current_v_set = set(vehicle_ids)
-        tracked_v_set = set(custom_waiting_times.keys())
-        for finished_v in tracked_v_set - current_v_set:
+        for finished_v in set(custom_waiting_times.keys()) - current_v_set:
             del custom_waiting_times[finished_v]
 
-        # 2. 各車両の速度をチェックし、2.5 m/s 未満（徐行・渋滞）なら滞留時間を累積
+        speeds = []
         for v_id in vehicle_ids:
-            if v_id not in custom_waiting_times:
-                custom_waiting_times[v_id] = 0.0
+            try:
+                speed = traci.vehicle.getSpeed(v_id)
+                speeds.append(speed)
 
-            speed = traci.vehicle.getSpeed(v_id)
-            if speed < 2.5:
-                custom_waiting_times[v_id] += 1.0
-        
-        # 3. 評価指標の計算
-        if num_vehicles > 0:
+                if v_id not in custom_waiting_times:
+                    custom_waiting_times[v_id] = 0.0
+
+                if speed < 2.5:
+                    custom_waiting_times[v_id] += delta_t
+            except Exception:
+                pass
+
+        if num_vehicles > 0 and speeds:
             total_waiting_time = sum(custom_waiting_times.get(v_id, 0.0) for v_id in vehicle_ids)
             mean_waiting_time = total_waiting_time / num_vehicles
-            mean_speed = sum([traci.vehicle.getSpeed(v) for v in vehicle_ids]) / num_vehicles
+            mean_speed = sum(speeds) / len(speeds)
         else:
             mean_waiting_time = 0.0
             mean_speed = 0.0
 
         arrived_vehicles = traci.simulation.getArrivedNumber()
 
-        # metrics_data の構築
         metrics_data = {
             "step": step,
-            "sim_time": sim_time,
+            "sim_time": round(sim_time, 3),
             "active_vehicles": num_vehicles,
             "arrived_vehicles": arrived_vehicles,
-            "mean_waiting_time_sec": round(mean_waiting_time, 2),
-            "mean_speed_m_s": round(mean_speed, 2)
+            "mean_waiting_time_sec": round(mean_waiting_time, 3),
+            "mean_speed_m_s": round(mean_speed, 3),
         }
 
-        # リストへ保存
         metrics_history.append(metrics_data)
 
-        # Kafka へストリーミング送信
         try:
-            producer.send('chino-traffic-metrics', value=metrics_data)
+            producer.send("chino-traffic-metrics", value=metrics_data)
         except Exception as e:
             print(f"Kafka送信エラー: {e}")
 
-        # コンソール進捗表示
-        if vehicle_ids:
-            speeds = [traci.vehicle.getSpeed(v) for v in vehicle_ids]
+        if speeds and int(sim_time) % 10 == 0 and abs(sim_time - round(sim_time)) < (delta_t * 0.6):
             min_speed = min(speeds)
-            slow_vehicles = [v for v, s in zip(vehicle_ids, speeds) if s < 2.5]
-            
-            if int(sim_time) % 10 == 0:
-                print(f"[TLS DEBUG t={sim_time}s] 車両数:{len(vehicle_ids)}台 | 最小速度:{min_speed:.2f}m/s | 2.5未満(徐行):{len(slow_vehicles)}台")
+            slow_count = sum(1 for s in speeds if s < 2.5)
+            print(f"[TLS DEBUG t={sim_time:.1f}s] 車両数:{num_vehicles}台 | 最小速度:{min_speed:.2f}m/s | 2.5未満(徐行):{slow_count}台")
 
         if step % 100 == 0:
-            print(f"[TLS Step {step}] 走行台数: {num_vehicles}台 | 平均待ち時間: {mean_waiting_time:.2f}秒")
+            print(f"[TLS Step {step} | t={sim_time:.1f}s] 走行台数: {num_vehicles}台 | 平均待ち時間: {mean_waiting_time:.2f}秒")
 
     traci.close()
     producer.flush()
 
-    # =========================================================
-    # ★ エクセル / CSV への出力処理 ★
-    # =========================================================
     print("\n[TLS] 研究データをファイルへ書き出しています...")
     df = pd.DataFrame(metrics_history)
 
     excel_filename = f"research_metrics_{tag}.xlsx"
-    df.to_excel(excel_filename, index=False, engine='openpyxl')
+    df.to_excel(excel_filename, index=False, engine="openpyxl")
     print(f"Excel ファイルを出力しました: {excel_filename}")
 
     csv_filename = f"research_metrics_{tag}.csv"
     df.to_csv(csv_filename, index=False, encoding="utf-8-sig")
     print(f"CSV ファイルを出力しました: {csv_filename}")
 
-    print("[TLS] シミュレーションおよびデータ保存が完了しました！")
 
 if __name__ == "__main__":
-    import sys
-    tag = sys.argv[1] if len(sys.argv) > 1 else "TLS"
-    run_simulation(tag)
+    run_simulation()
